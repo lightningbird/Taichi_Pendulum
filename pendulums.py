@@ -10,8 +10,7 @@ g = 9.8
 res = 500
 max_points_stored = 10000
 # variables
-paused = ti.field(ti.int32, ())
-traj_a_enabled = ti.field(ti.int32, ())
+sim = ti.field(ti.int32, ())
 traj_b_enabled = ti.field(ti.int32, ())
 
 origin = ti.Vector.field(2, ti.f32, 1)
@@ -26,7 +25,6 @@ E = ti.field(ti.f32, ())
 E_init = ti.field(ti.f32, ())
 
 num_p = ti.field(ti.i32, ())
-traj_a = ti.Vector.field(2, ti.f32, max_points_stored)
 traj_b = ti.Vector.field(2, ti.f32, max_points_stored)
 
 @ti.func
@@ -47,8 +45,7 @@ def compute_E():
 
 @ti.kernel
 def initialize():
-    paused = 0
-    traj_a_enabled = 0
+    sim = 0
     traj_b_enabled = 0
     # mid point of the top
     origin[0] = ti.Vector([0.5, 1.0])
@@ -59,17 +56,13 @@ def initialize():
     m[0] = 50.0
     m[1] = 50.0
     # initial angels
-    #theta[0] = ti.random() * math.pi / 2.0
-    #theta[1] = ti.random() * math.pi / 5.0
     theta[0] = math.pi / 4.0
     theta[1] = math.pi / 2.0
-
     # initial angular velocity
     omega[0] = 0.0
     omega[1] = 0.0
     # compute initial positions
     compute_pos()
-    traj_a[0] = pos_a[0]
     traj_b[0] = pos_b[0]
     num_p[None] = 1
     # compute inital energy
@@ -94,7 +87,6 @@ def compute_domega():
 
 @ti.kernel
 def update():
-    E_prev = E[None]
     for i in range(substeps):
         compute_domega()
         omega[0] += dt * domega[0]
@@ -104,7 +96,6 @@ def update():
         compute_pos()
     i = num_p[None]
     if i<max_points_stored:
-        traj_a[i] = pos_a[0]
         traj_b[i] = pos_b[0]
         num_p[None] += 1
     # check total energy
@@ -121,21 +112,17 @@ def main():
         for e in gui.get_events(ti.GUI.PRESS):
             if e.key in [ti.GUI.ESCAPE, ti.GUI.EXIT]:
                 exit()
-            elif e.key == ti.GUI.SPACE:
-                paused[None] = not paused[None]
+            elif e.key == 's':
+                sim[None] = not sim[None]
             elif e.key == 't':
                 traj_b_enabled[None] = not traj_b_enabled[None]
-            elif e.key == 'y':
-                traj_a_enabled[None] = not traj_a_enabled[None]
-        if not paused[None]:
+        if sim[None]:
             update()
         
         gui.line(begin = origin[0], end = pos_a[0], color = 0xffffff)
         gui.circle(pos_a[0], color = 0xff0000, radius = 10)
         gui.line(begin = pos_a[0], end = pos_b[0], color = 0xffffff)
         gui.circle(pos_b[0], color = 0x0000ff, radius = 10)
-        if traj_a_enabled[None]:
-            gui.lines(begin = traj_a.to_numpy()[0:num_p[None]-1], end=traj_a.to_numpy()[1:num_p[None]], color = 0xff0000)
         if traj_b_enabled[None]:
             gui.lines(begin = traj_b.to_numpy()[0:num_p[None]-1], end=traj_b.to_numpy()[1:num_p[None]], color = 0x0000ff)
         gui.show()
