@@ -69,6 +69,18 @@ def initialize():
     compute_E()
     E_init[None] = E[None]
 
+@ti.kernel
+def update_initial(delta_theta0: ti.f32, delta_theta1: ti.f32):
+    theta[0] += delta_theta0
+    theta[1] += delta_theta1
+    # compute initial positions
+    compute_pos()
+    traj_b[0] = pos_b[0]
+    num_p[None] = 1
+    # compute inital energy
+    compute_E()
+    E_init[None] = E[None]
+
 @ti.func
 def compute_domega():
     s01 = ti.sin(theta[0] - theta[1])
@@ -116,6 +128,20 @@ def main():
                 sim[None] = not sim[None]
             elif e.key == 't':
                 traj_b_enabled[None] = not traj_b_enabled[None]
+            if not sim[None]:
+                if e.key == 'y' and theta[0] < math.pi / 2.0:
+                    update_initial(math.pi/20.0, 0.0)
+                    print('update initial angle 1 to ', int(theta[0] * 180 / math.pi), 'degrees')
+                elif e.key == 'u' and theta[0] > -math.pi / 2.0:
+                    update_initial(-math.pi/20.0, 0.0)
+                    print('update initial angle 1 to ', int(theta[0] * 180 / math.pi), 'degrees')
+                elif e.key == 'i' and theta[1] < math.pi / 2.0:
+                    update_initial(0.0, math.pi/20.0)
+                    print('update initial angle 2 to ', int(theta[1] * 180 / math.pi), 'degrees')
+                elif e.key == 'o' and theta[1] > -math.pi / 2.0:
+                    update_initial(0.0, -math.pi/20.0)
+                    print('update initial angle 2 to ', int(theta[1] * 180 / math.pi), 'degrees')
+
         if sim[None]:
             update()
         
