@@ -6,7 +6,12 @@
 ## 成功效果展示
 双摆下摆球轨迹图
 
-![double pendulums demo](./data/pendulums_result.png)
+初始角度
+demo 1 上摆球：45度  下摆球：90度
+demo 2 上摆球：45度  下摆球：-90度
+
+![double pendulums demo 1](./data/demo1.gif)
+![double pendulums demo 2](./data/demo2.gif)
 
 ## 整体结构
 ```
