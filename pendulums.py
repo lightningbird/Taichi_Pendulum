@@ -7,7 +7,7 @@ ti.init(arch = ti.cpu)
 dt = 1e-3
 substeps = 10
 g = 9.8
-res = 500
+res = 256
 max_points_stored = 10000
 # variables
 sim = ti.field(ti.int32, ())
@@ -27,7 +27,7 @@ E_init = ti.field(ti.f32, ())
 num_p = ti.field(ti.i32, ())
 traj_b = ti.Vector.field(2, ti.f32, max_points_stored)
 
-@ti.func
+@ti.pyfunc
 def compute_pos():
     x0 = origin[0][0] + L[0] * ti.sin(theta[0])
     y0 = origin[0][1] - L[0] * ti.cos(theta[0])
@@ -36,14 +36,13 @@ def compute_pos():
     pos_a[0] = ti.Vector([x0, y0])
     pos_b[0] = ti.Vector([x1, y1])
 
-@ti.func
+@ti.pyfunc
 def compute_E():
     T = 0.5 * (m[0]+m[1]) * (omega[0] * L[0])**2 + 0.5 * m[1] * (omega[1]*L[1])**2 + \
         m[1]*L[0]*L[1]* ti.cos(theta[0] - theta[1]) * omega[0] * omega[1]
     V = (m[0]+m[1])*g*L[0]*ti.cos(theta[0]) + m[1]*g*L[1]*ti.cos(theta[1])
     E[None] = T + V
 
-@ti.kernel
 def initialize():
     sim = 0
     traj_b_enabled = 0
@@ -69,10 +68,12 @@ def initialize():
     compute_E()
     E_init[None] = E[None]
 
-@ti.kernel
 def update_initial(delta_theta0: ti.f32, delta_theta1: ti.f32):
     theta[0] += delta_theta0
     theta[1] += delta_theta1
+    # clear angular velocity
+    omega[0] = 0.0
+    omega[1] = 0.0
     # compute initial positions
     compute_pos()
     traj_b[0] = pos_b[0]
@@ -97,15 +98,18 @@ def compute_domega():
     domega[1] = (m[1]*L[1]*s01*c01*o1_sqr + (m[0]+m[1])*L[0]*s01*o0_sqr + \
                 (m[0]+m[1])*g*(s0*c01 - s1) ) / (-L[1] * denom)
 
+# update using Symplectic Euler method
 @ti.kernel
 def update():
+    compute_domega()
+    for i in range(2):
+        omega[i] += dt * domega[i]
+        theta[i] += dt * omega[i]
+    compute_pos()
+
+def step():
     for i in range(substeps):
-        compute_domega()
-        omega[0] += dt * domega[0]
-        omega[1] += dt * domega[1]
-        theta[0] += dt * omega[0]
-        theta[1] += dt * omega[1]
-        compute_pos()
+        update()
     i = num_p[None]
     if i<max_points_stored:
         traj_b[i] = pos_b[0]
@@ -143,12 +147,12 @@ def main():
                     print('update initial angle 2 to ', int(theta[1] * 180 / math.pi), 'degrees')
 
         if sim[None]:
-            update()
+            step()
         
         gui.line(begin = origin[0], end = pos_a[0], color = 0xffffff)
-        gui.circle(pos_a[0], color = 0xff0000, radius = 10)
+        gui.circle(pos_a[0], color = 0xff0000, radius = 8)
         gui.line(begin = pos_a[0], end = pos_b[0], color = 0xffffff)
-        gui.circle(pos_b[0], color = 0x0000ff, radius = 10)
+        gui.circle(pos_b[0], color = 0x0000ff, radius = 8)
         if traj_b_enabled[None]:
             gui.lines(begin = traj_b.to_numpy()[0:num_p[None]-1], end=traj_b.to_numpy()[1:num_p[None]], color = 0x0000ff)
         gui.show()
